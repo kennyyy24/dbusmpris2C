@@ -31,8 +31,12 @@ int main()
 	MPRIS2rc_Stop(&VLCRC);
 	sleep(5);
 	MPRIS2rc_Play(&VLCRC);
+	MPRIS2rc_SetLoopPlaylist(&VLCRC);
 	sleep(3);
 	MPRIS2rc_Toggle(&VLCRC);
+	sleep(3);
+	MPRIS2rc_Toggle(&VLCRC);
+	sleep(100);
 
 
 	//Quit player

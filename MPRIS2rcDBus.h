@@ -55,7 +55,12 @@ void MPRIS2rc_Seek(MPRIS2rc *rc, float relative_pos_in_ms);
 float MPRIS2rc_GetPosition(MPRIS2rc *rc);
 float MPRIS2rc_GetDuration(MPRIS2rc *rc);
 float MPRIS2rc_GetVolume(MPRIS2rc *rc);
-int MPRIS2rc_SetLoop(MPRIS2rc *rc);
+float MPRIS2rc_SetVolume(MPRIS2rc *rc, double volume);
+void MPRIS2rc_Mute(MPRIS2rc *rc);
+void MPRIS2rc_Unmute(MPRIS2rc *rc);
+void MPRIS2rc_SetLoopNone(MPRIS2rc *rc);
+void MPRIS2rc_SetLoopTrack(MPRIS2rc *rc);
+void MPRIS2rc_SetLoopPlaylist(MPRIS2rc *rc);
 
 
 
@@ -442,7 +447,7 @@ void MPRIS2rc_Stop(MPRIS2rc *rc)
 
 
 /*####################### SPEED CONTROLS #########################*/
-/* !!!!!!!!!!!    VLC SPECIFIC FOR THE MOMENT !!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!  VLC SPECIFIC AT THE MOMENT !!!!!!!!!!!!!!!!!!!*/
 //!Set Playing rate
 float MPRIS2rc_SetRate(MPRIS2rc *rc, double r)
 {
@@ -514,7 +519,7 @@ float MPRIS2rc_NormalSpeed(MPRIS2rc *rc)
 
 
 /*###################### POSITION CONTROLS ########################*/
-/* !!!!!!!!!!!    OMXPLAYER SPECIFIC FOR THE MOMENT !!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!! OMXPLAYER SPECIFIC AT THE MOMENT !!!!!!!!!!!!!!!*/
 //!Set playing position (absolute)
 float MPRIS2rc_SetPosition(MPRIS2rc *rc, float pos_in_ms)
 {
@@ -549,7 +554,6 @@ float MPRIS2rc_SetPosition(MPRIS2rc *rc, float pos_in_ms)
     else
         return (ret/1000.);
 }
-
 //!Set playing position (relative)
 void MPRIS2rc_Seek(MPRIS2rc *rc, float relative_pos_in_ms)
 {
@@ -577,7 +581,6 @@ void MPRIS2rc_Seek(MPRIS2rc *rc, float relative_pos_in_ms)
     //Send
     MPRIS2rc_SendMessage(rc);
 }
-
 //!Get (absolute) playing position (in ms)
 float MPRIS2rc_GetPosition(MPRIS2rc *rc)
 {
@@ -599,7 +602,6 @@ float MPRIS2rc_GetPosition(MPRIS2rc *rc)
     else
         return (ret/1000.);
 }
-
 //!Get track duration (in ms)
 float MPRIS2rc_GetDuration(MPRIS2rc *rc)
 {
@@ -625,6 +627,10 @@ float MPRIS2rc_GetDuration(MPRIS2rc *rc)
 /*----------------------------------------------------------------*/
 
 
+
+/*####################### VOLUME CONTROLS ########################*/
+/* !!!!!!!!!!!!!!! OMXPLAYER SPECIFIC AT THE MOMENT !!!!!!!!!!!!!!!*/
+//!Return current volume (1.0 is normal)
 float MPRIS2rc_GetVolume(MPRIS2rc *rc)
 {
     //Prepare Message (method to call) for sending
@@ -641,10 +647,166 @@ float MPRIS2rc_GetVolume(MPRIS2rc *rc)
     //Send and get reply
     return MPRIS2rc_SendMessageWithDoubleIntReply(rc);
 }
-
-//!Set loop playback: NOT IMPLEMENTED
-int MPRIS2rc_SetLoop(MPRIS2rc *rc)
+//!Set the current volume (1.0 is normal)
+float MPRIS2rc_SetVolume(MPRIS2rc *rc, double volume)
 {
-    return -1;
+    //Prepare Message (method to call) for sending
+	rc->Message=NULL;
+	rc->Message = dbus_message_new_method_call (
+	rc->BusDestination,
+	rc->BusPath,
+	rc->BusPropertiesInterface,
+	"Volume");
+	if (rc->Message == NULL)    {
+        fprintf(stderr, "Cannot allocate DBus Message!\n");
+    }
+
+    dbus_message_append_args (rc->Message,
+                               DBUS_TYPE_DOUBLE, &volume,
+                               DBUS_TYPE_INVALID);
+
+    //Send and get reply
+    return MPRIS2rc_SendMessageWithDoubleIntReply(rc);
+}
+//!Mute
+void MPRIS2rc_Mute(MPRIS2rc *rc)
+{
+    //Prepare Message (method to call) for sending
+	rc->Message=NULL;
+	rc->Message = dbus_message_new_method_call (
+	rc->BusDestination,
+	rc->BusPath,
+	rc->BusPropertiesInterface,
+	"Mute");
+	if (rc->Message == NULL)    {
+        fprintf(stderr, "Cannot allocate DBus Message!\n");
+    }
+
+    //Send and get reply
+    MPRIS2rc_SendMessage(rc);
+}
+//!Unmute
+void MPRIS2rc_Unmute(MPRIS2rc *rc)
+{
+    //Prepare Message (method to call) for sending
+	rc->Message=NULL;
+	rc->Message = dbus_message_new_method_call (
+	rc->BusDestination,
+	rc->BusPath,
+	rc->BusPropertiesInterface,
+	"Unmute");
+	if (rc->Message == NULL)    {
+        fprintf(stderr, "Cannot allocate DBus Message!\n");
+    }
+
+    //Send and get reply
+    MPRIS2rc_SendMessage(rc);
 }
 
+/*----------------------------------------------------------------*/
+
+
+
+/* !!!!!!!!!!!!!!!  VLC SPECIFIC AT THE MOMENT !!!!!!!!!!!!!!!!!!!*/
+//!Set loop playback to NONE (no loop)
+void MPRIS2rc_SetLoopNone(MPRIS2rc *rc)
+{
+    //Prepare Message (method to call) for sending
+	rc->Message=NULL;
+	rc->Message = dbus_message_new_method_call (
+	rc->BusDestination,
+	rc->BusPath,
+	rc->BusPropertiesInterface,
+	"Set");
+	if (rc->Message == NULL)    {
+        fprintf(stderr, "MPRIS2rc_SetLoopNone: Cannot allocate DBus Message!\n");
+    }
+
+    //No reply needed
+    dbus_message_set_no_reply(rc->Message, TRUE);
+
+    //Message arguments
+    const char *arg1 = rc->BusPlayerInterface;
+    const char *arg2 = "LoopStatus";
+    const char *arg3 = "None";
+
+    //Variant type not supported by append_args so use iter...
+    DBusMessageIter iter, variant;
+    dbus_message_iter_init_append(rc->Message, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &arg1);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &arg2);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, DBUS_TYPE_STRING_AS_STRING, &variant);
+	dbus_message_iter_append_basic(&variant, DBUS_TYPE_STRING, &arg3);
+	dbus_message_iter_close_container(&iter, &variant);
+
+    //Send
+    MPRIS2rc_SendMessage(rc);
+}
+//!Set loop playback to TRACK (loop on current track only)
+void MPRIS2rc_SetLoopTrack(MPRIS2rc *rc)
+{
+    //Prepare Message (method to call) for sending
+	rc->Message=NULL;
+	rc->Message = dbus_message_new_method_call (
+	rc->BusDestination,
+	rc->BusPath,
+	rc->BusPropertiesInterface,
+	"Set");
+	if (rc->Message == NULL)    {
+        fprintf(stderr, "MPRIS2rc_SetLoopTrack: Cannot allocate DBus Message!\n");
+    }
+
+    //No reply needed
+    dbus_message_set_no_reply(rc->Message, TRUE);
+
+    //Message arguments
+    const char *arg1 = rc->BusPlayerInterface;
+    const char *arg2 = "LoopStatus";
+    const char *arg3 = "Track";
+
+    //Variant type not supported by append_args so use iter...
+    DBusMessageIter iter, variant;
+    dbus_message_iter_init_append(rc->Message, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &arg1);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &arg2);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, DBUS_TYPE_STRING_AS_STRING, &variant);
+	dbus_message_iter_append_basic(&variant, DBUS_TYPE_STRING, &arg3);
+	dbus_message_iter_close_container(&iter, &variant);
+
+    //Send
+    MPRIS2rc_SendMessage(rc);
+}
+//!Set loop playback to PLAYLIST (loop on the whole playlist)
+void MPRIS2rc_SetLoopPlaylist(MPRIS2rc *rc)
+{
+    //Prepare Message (method to call) for sending
+	rc->Message=NULL;
+	rc->Message = dbus_message_new_method_call (
+	rc->BusDestination,
+	rc->BusPath,
+	rc->BusPropertiesInterface,
+	"Set");
+	if (rc->Message == NULL)    {
+        fprintf(stderr, "MPRIS2rc_SetLoopPlaylist: Cannot allocate DBus Message!\n");
+    }
+
+    //No reply needed
+    dbus_message_set_no_reply(rc->Message, TRUE);
+
+    //Message arguments
+    const char *arg1 = rc->BusPlayerInterface;
+    const char *arg2 = "LoopStatus";
+    const char *arg3 = "Playlist";
+
+    //Variant type not supported by append_args so use iter...
+    DBusMessageIter iter, variant;
+    dbus_message_iter_init_append(rc->Message, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &arg1);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &arg2);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, DBUS_TYPE_STRING_AS_STRING, &variant);
+	dbus_message_iter_append_basic(&variant, DBUS_TYPE_STRING, &arg3);
+	dbus_message_iter_close_container(&iter, &variant);
+
+    //Send
+    MPRIS2rc_SendMessage(rc);
+}

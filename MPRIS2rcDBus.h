@@ -70,36 +70,29 @@ void MPRIS2rc_SetLoopPlaylist(MPRIS2rc *rc);
 //!Convenient function to actually send a prepared Message
 void MPRIS2rc_SendMessage(MPRIS2rc *rc)
 {
-    /*if(strcmp(rc->BusPath, "fake")!=0)
-    {*/
-        //Send the Message
-        dbus_connection_send(rc->Connection, rc->Message, NULL);
-        if ( dbus_error_is_set(&rc->Error) )
-        {
-            fprintf(stderr, "MPRIS2rc_SendMessage: Error: %s\n", rc->Error.message);
-            dbus_error_free(&rc->Error);
-        }
+	//Send the Message
+	dbus_connection_send(rc->Connection, rc->Message, NULL);
+	if ( dbus_error_is_set(&rc->Error) )
+	{
+		fprintf(stderr, "MPRIS2rc_SendMessage: Error: %s\n", rc->Error.message);
+		dbus_error_free(&rc->Error);
+	}
 
-        //Flush needed (or recommended) if not using bus loop
-        dbus_connection_flush(rc->Connection);
-        if ( dbus_error_is_set(&rc->Error) )
-        {
-            fprintf(stderr, "MPRIS2rc_SendMessage: Error: %s\n", rc->Error.message);
-            dbus_error_free(&rc->Error);
-        }
+	//Flush needed (or recommended) if not using bus loop
+	dbus_connection_flush(rc->Connection);
+	if ( dbus_error_is_set(&rc->Error) )
+	{
+		fprintf(stderr, "MPRIS2rc_SendMessage: Error: %s\n", rc->Error.message);
+		dbus_error_free(&rc->Error);
+	}
 
-        //Why not ?
-        dbus_message_unref (rc->Message);
-        if ( dbus_error_is_set(&rc->Error) )
-        {
-            fprintf(stderr, "MPRIS2rc_SendMessage: Error: %s\n", rc->Error.message);
-            dbus_error_free(&rc->Error);
-        }
-    /*}
-    else
-    {
-        printf("Send: %s\n", dbus_message_get_member(rc->Message));
-    }*/
+	//Why not ?
+	dbus_message_unref (rc->Message);
+	if ( dbus_error_is_set(&rc->Error) )
+	{
+		fprintf(stderr, "MPRIS2rc_SendMessage: Error: %s\n", rc->Error.message);
+		dbus_error_free(&rc->Error);
+	}
 }
 
 //!Convenient function to actually send a prepared Message and get a DOUBLE or a INT reply
@@ -248,18 +241,6 @@ int MPRIS2rc_Open(MPRIS2rc *rc, const char *player, int instance_nb)
 			sprintf(export_bus, "DBUS_SESSION_BUS_ADDRESS=%s", dbus_addr);
 			putenv(export_bus);
 			break;
-
-        /*fake player
-        case 'f':
-            printf("MPRIS2rc_Open:: USING FAKE MODE.\n");
-            //Init bus parameters (constant)
-			rc->BusPath = "fake";
-			rc->BusPlayerInterface = "fake";
-			rc->BusPropertiesInterface = "fake";
-			rc->BusMainInterface = "fake";
-			//Default destination
-			sprintf(rc->BusDestination, "fake");
-            break;*/
 
 		//other: error
 		default:

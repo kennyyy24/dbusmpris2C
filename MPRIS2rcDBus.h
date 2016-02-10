@@ -24,7 +24,7 @@
 
 typedef struct MPRIS2rcs
 {
-    DBusConnection *Connection;
+	DBusConnection *Connection;
 	DBusMessage *Message;
 	DBusError Error;
 	char BusDestination[1024];
@@ -46,13 +46,14 @@ int MPRIS2rc_Toggle(MPRIS2rc *rc);
 void MPRIS2rc_Play(MPRIS2rc *rc);
 void MPRIS2rc_Pause(MPRIS2rc *rc);
 void MPRIS2rc_Stop(MPRIS2rc *rc);
+float MPRIS2rc_GetRate(MPRIS2rc *rc);
 float MPRIS2rc_SetRate(MPRIS2rc *rc, double r);
 float MPRIS2rc_Faster(MPRIS2rc *rc);
 float MPRIS2rc_Slower(MPRIS2rc *rc);
 float MPRIS2rc_NormalSpeed(MPRIS2rc *rc);
+float MPRIS2rc_GetPosition(MPRIS2rc *rc);
 float MPRIS2rc_SetPosition(MPRIS2rc *rc, float pos_in_ms);
 void MPRIS2rc_Seek(MPRIS2rc *rc, float relative_pos_in_ms);
-float MPRIS2rc_GetPosition(MPRIS2rc *rc);
 float MPRIS2rc_GetDuration(MPRIS2rc *rc);
 float MPRIS2rc_GetVolume(MPRIS2rc *rc);
 float MPRIS2rc_SetVolume(MPRIS2rc *rc, double volume);
@@ -178,6 +179,26 @@ double MPRIS2rc_SendMessageWithDoubleIntReply(MPRIS2rc *rc)
 		dbus_int32_t int16_val;
 		dbus_message_iter_get_basic(&args, &int16_val);
 		val=(double)int16_val;
+	}
+	else if (DBUS_TYPE_VARIANT == dbus_message_iter_get_arg_type(&args))
+	{
+		DBusMessageIter variant;
+		dbus_message_iter_recurse(&args, &variant);
+		if (DBUS_TYPE_INT64 == dbus_message_iter_get_arg_type(&variant))
+		{
+			dbus_int64_t int64_val;
+			dbus_message_iter_get_basic(&variant, &int64_val);
+			val=(double)int64_val;
+		}
+		else if (DBUS_TYPE_DOUBLE == dbus_message_iter_get_arg_type(&variant))
+		{
+			dbus_message_iter_get_basic(&variant, &double_val);
+			val=double_val;
+		}
+		else
+		{
+			return -1;
+		}
 	}
 	else
 	{
@@ -428,7 +449,36 @@ void MPRIS2rc_Stop(MPRIS2rc *rc)
 
 
 /*####################### SPEED CONTROLS #########################*/
-/* !!!!!!!!!!!!!!!  VLC SPECIFIC AT THE MOMENT !!!!!!!!!!!!!!!!!!!*/
+//!Return playing rate retrieved from the player and update internal rate value
+float MPRIS2rc_GetRate(MPRIS2rc *rc)
+{
+	//Prepare Message (method to call) for sending
+	rc->Message=NULL;
+	rc->Message = dbus_message_new_method_call (
+	rc->BusDestination,
+	rc->BusPath,
+	rc->BusPropertiesInterface,
+	"Get");
+	if (rc->Message == NULL) {
+		fprintf(stderr, "Cannot allocate DBus Message!\n");
+	}
+
+	//Message arguments
+	const char *arg1 = rc->BusPlayerInterface;
+	const char *arg2 = "Rate";
+
+	//Apppend the two string args
+	dbus_message_append_args(rc->Message, DBUS_TYPE_STRING, &arg1, DBUS_TYPE_STRING, &arg2, DBUS_TYPE_INVALID);
+
+	//Send and get reply
+	double ret=MPRIS2rc_SendMessageWithDoubleIntReply(rc);
+	if(ret>0)
+	{
+		rc->Rate=ret;
+	}
+	
+	return ret;
+}
 //!Set Playing rate
 float MPRIS2rc_SetRate(MPRIS2rc *rc, double r)
 {
@@ -500,8 +550,36 @@ float MPRIS2rc_NormalSpeed(MPRIS2rc *rc)
 
 
 /*###################### POSITION CONTROLS ########################*/
-/* !!!!!!!!!!!!!!! OMXPLAYER SPECIFIC AT THE MOMENT !!!!!!!!!!!!!!!*/
+//!Get (absolute) playing position (in ms)
+float MPRIS2rc_GetPosition(MPRIS2rc *rc)
+{
+	//Prepare Message (method to call) for sending
+	rc->Message=NULL;
+	rc->Message = dbus_message_new_method_call (
+	rc->BusDestination,
+	rc->BusPath,
+	rc->BusPropertiesInterface,
+	"Get");
+	if (rc->Message == NULL) {
+		fprintf(stderr, "Cannot allocate DBus Message!\n");
+	}
+	
+	//Message arguments
+	const char *arg1 = rc->BusPlayerInterface;
+	const char *arg2 = "Position";
+
+	//Apppend the two string args
+	dbus_message_append_args(rc->Message, DBUS_TYPE_STRING, &arg1, DBUS_TYPE_STRING, &arg2, DBUS_TYPE_INVALID);
+	
+	//Send and get reply (and convert from us to ms)
+	double ret=MPRIS2rc_SendMessageWithDoubleIntReply(rc);
+	if(ret==-1)
+		return -1;
+	else
+		return (ret/1000.);
+}
 //!Set playing position (absolute)
+/* !!!!!!!!!!!!!!! OMXPLAYER SPECIFIC AT THE MOMENT !!!!!!!!!!!!!!!*/
 float MPRIS2rc_SetPosition(MPRIS2rc *rc, float pos_in_ms)
 {
 	//Prepare Message (method to call) for sending
@@ -514,9 +592,6 @@ float MPRIS2rc_SetPosition(MPRIS2rc *rc, float pos_in_ms)
 	if (rc->Message == NULL) {
 		fprintf(stderr, "Cannot allocate DBus Message!\n");
 	}
-
-	//No reply needed
-	//dbus_message_set_no_reply(rc->Message, TRUE);
 
 	//Message arguments
 	printf("Request position %.3fms\n", pos_in_ms);
@@ -562,28 +637,8 @@ void MPRIS2rc_Seek(MPRIS2rc *rc, float relative_pos_in_ms)
 	//Send
 	MPRIS2rc_SendMessage(rc);
 }
-//!Get (absolute) playing position (in ms)
-float MPRIS2rc_GetPosition(MPRIS2rc *rc)
-{
-	//Prepare Message (method to call) for sending
-	rc->Message=NULL;
-	rc->Message = dbus_message_new_method_call (
-	rc->BusDestination,
-	rc->BusPath,
-	rc->BusPropertiesInterface,
-	"Position");
-	if (rc->Message == NULL) {
-		fprintf(stderr, "Cannot allocate DBus Message!\n");
-	}
-
-	//Send and get reply (and convert from us to ms)
-	double ret=MPRIS2rc_SendMessageWithDoubleIntReply(rc);
-	if(ret==-1)
-		return -1;
-	else
-		return (ret/1000.);
-}
 //!Get track duration (in ms)
+/* !!!!!!!!!!!!!!! OMXPLAYER SPECIFIC AT THE MOMENT !!!!!!!!!!!!!!!*/
 float MPRIS2rc_GetDuration(MPRIS2rc *rc)
 {
 	//Prepare Message (method to call) for sending
@@ -610,7 +665,6 @@ float MPRIS2rc_GetDuration(MPRIS2rc *rc)
 
 
 /*####################### VOLUME CONTROLS ########################*/
-/* !!!!!!!!!!!!!!! OMXPLAYER SPECIFIC AT THE MOMENT !!!!!!!!!!!!!!!*/
 //!Return current volume (1.0 is normal)
 float MPRIS2rc_GetVolume(MPRIS2rc *rc)
 {
@@ -620,10 +674,17 @@ float MPRIS2rc_GetVolume(MPRIS2rc *rc)
 	rc->BusDestination,
 	rc->BusPath,
 	rc->BusPropertiesInterface,
-	"Volume");
+	"Get");
 	if (rc->Message == NULL) {
 		fprintf(stderr, "Cannot allocate DBus Message!\n");
 	}
+
+	//Message arguments
+	const char *arg1 = rc->BusPlayerInterface;
+	const char *arg2 = "Volume";
+
+	//Apppend the two string args
+	dbus_message_append_args(rc->Message, DBUS_TYPE_STRING, &arg1, DBUS_TYPE_STRING, &arg2, DBUS_TYPE_INVALID);
 
 	//Send and get reply
 	return MPRIS2rc_SendMessageWithDoubleIntReply(rc);
@@ -637,19 +698,29 @@ float MPRIS2rc_SetVolume(MPRIS2rc *rc, double volume)
 	rc->BusDestination,
 	rc->BusPath,
 	rc->BusPropertiesInterface,
-	"Volume");
+	"Set");
 	if (rc->Message == NULL) {
 		fprintf(stderr, "Cannot allocate DBus Message!\n");
 	}
+	
+	//Message arguments
+	const char *arg1 = rc->BusPlayerInterface;
+	const char *arg2 = "Volume";
 
-	dbus_message_append_args (rc->Message,
-							   DBUS_TYPE_DOUBLE, &volume,
-							   DBUS_TYPE_INVALID);
+	//Variant type not supported by append_args so use iter...
+	DBusMessageIter iter, variant;
+	dbus_message_iter_init_append(rc->Message, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &arg1);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &arg2);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, DBUS_TYPE_DOUBLE_AS_STRING, &variant);
+	dbus_message_iter_append_basic(&variant, DBUS_TYPE_DOUBLE, &volume);
+	dbus_message_iter_close_container(&iter, &variant);
 
 	//Send and get reply
 	return MPRIS2rc_SendMessageWithDoubleIntReply(rc);
 }
 //!Mute
+/* !!!!!!!!!!!!!!! OMXPLAYER SPECIFIC AT THE MOMENT !!!!!!!!!!!!!!!*/
 void MPRIS2rc_Mute(MPRIS2rc *rc)
 {
 	//Prepare Message (method to call) for sending
@@ -667,6 +738,7 @@ void MPRIS2rc_Mute(MPRIS2rc *rc)
 	MPRIS2rc_SendMessage(rc);
 }
 //!Unmute
+/* !!!!!!!!!!!!!!! OMXPLAYER SPECIFIC AT THE MOMENT !!!!!!!!!!!!!!!*/
 void MPRIS2rc_Unmute(MPRIS2rc *rc)
 {
 	//Prepare Message (method to call) for sending
@@ -687,7 +759,7 @@ void MPRIS2rc_Unmute(MPRIS2rc *rc)
 /*----------------------------------------------------------------*/
 
 
-
+/*####################### PLAYLIST CONTROLS ########################*/
 /* !!!!!!!!!!!!!!!  VLC SPECIFIC AT THE MOMENT !!!!!!!!!!!!!!!!!!!*/
 //!Set loop playback to NONE (no loop)
 void MPRIS2rc_SetLoopNone(MPRIS2rc *rc)
@@ -791,3 +863,5 @@ void MPRIS2rc_SetLoopPlaylist(MPRIS2rc *rc)
 	//Send
 	MPRIS2rc_SendMessage(rc);
 }
+
+/*----------------------------------------------------------------*/

@@ -197,6 +197,9 @@ double MPRIS2rc_SendMessageWithDoubleIntReply(MPRIS2rc *rc)
 		}
 		else
 		{
+			//Free reply msg
+			dbus_message_unref(msg);
+			fprintf(stderr, "MPRIS2rc_SendMessageWithDoubleIntReply: Error: Reply is not a DOUBLE nor INT!\n");
 			return -1;
 		}
 	}
